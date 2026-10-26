@@ -172,6 +172,12 @@ int main(void) {
                  "thermo-1") == 0);
     CHECK(rb_registry_find_id(reg, "nope") == NULL);
     const char *tmpdir = getenv("TMPDIR");
+    /* Windows has no TMPDIR and no /tmp: TEMP/TMP are the native
+     * temp dirs (CI run 40330061998 failed here with fopen on
+     * "/tmp/rb_app_registry_test.json"). '/' after %TEMP% is fine
+     * for the MSVC CRT. Order matters: TMPDIR first on Unix. */
+    if (tmpdir == NULL) tmpdir = getenv("TEMP");
+    if (tmpdir == NULL) tmpdir = getenv("TMP");
     char path[512];
     snprintf(path, sizeof(path), "%s/rb_app_registry_test.json",
              tmpdir ? tmpdir : "/tmp");

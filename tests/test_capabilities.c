@@ -62,10 +62,25 @@ int main(void) {
     memset(&cfg, 0, sizeof(cfg));
     cfg.backend = RB_BACKEND_APPLE;
     CHECK_ST(rb_initialize(&cfg, &apctx), RB_ERROR_NOT_SUPPORTED);
+    /* WINDOWS is a stub (NOT_SUPPORTED) everywhere EXCEPT on
+     * Windows, where Phase 4 replaced it with the real backend:
+     * there explicit init returns OK when an adapter exists and
+     * UNAVAILABLE when it does not (CI runners have no adapter —
+     * CI run 40330061998 failed here expecting NOT_SUPPORTED).
+     * NOT_SUPPORTED on Windows would mean the stub is back, so it
+     * is rejected in both branches. */
     rb_context_t *wctx = NULL;
     memset(&cfg, 0, sizeof(cfg));
     cfg.backend = RB_BACKEND_WINDOWS;
+#ifdef _WIN32
+    {
+        rb_status_t wst = rb_initialize(&cfg, &wctx);
+        CHECK(wst == RB_OK || wst == RB_ERROR_UNAVAILABLE);
+        if (wst == RB_OK) rb_shutdown(wctx);
+    }
+#else
     CHECK_ST(rb_initialize(&cfg, &wctx), RB_ERROR_NOT_SUPPORTED);
+#endif
 
     rb_shutdown(ctx);
     TEST_END();
