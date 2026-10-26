@@ -276,9 +276,11 @@ Compile-time (Windows SDK machine, first thing):
 - [ ] `GattCommunicationStatus::{ProtocolError, AccessDenied}`
       member names.
 - [ ] `BluetoothCacheMode::Uncached` member name.
-- [ ] `WiFiAvailableNetwork::NetworkRssiInDecibelMilliwatts`
-      nullability (`IReference<int32>` assumed) and
-      `ChannelCenterFrequencyInKilohertz` type.
+- [x] `WiFiAvailableNetwork::NetworkRssiInDecibelMilliwatts`
+      (plain `int32_t`, NOT `IReference<int32>` — proven by CI
+      run 40329092476: `.Value()` failed with MSVC C2228) and
+      `ChannelCenterFrequencyInKilohertz` (uint32_t, compiled
+      clean on the same run).
 - [ ] `WiFiAccessStatus::DeniedByUser` member name.
 - [ ] `PasswordCredential` default constructor + `Password` setter.
 - [ ] Connectivity members: `NetworkInformation::
@@ -398,8 +400,6 @@ depends on an unverified member:
   `Accept()` is verified).
 - `BluetoothCacheMode::Uncached` (`Cached` was seen; `Uncached`
   is its symmetric partner).
-- `WiFiAvailableNetwork::NetworkRssiInDecibelMilliwatts`
-  nullability and `ChannelCenterFrequencyInKilohertz` type.
 - `WiFiAccessStatus::DeniedByUser` (`Allowed` and `DeniedBySystem`
   are verified).
 - `PasswordCredential` default constructor + `Password` setter.

@@ -134,14 +134,17 @@ static rb_wifi_network_t network_to_rb(wifi::WiFiAvailableNetwork net) {
     /* Bssid may be empty without location consent (see header). */
     rb_copy_str(out.bssid, sizeof(out.bssid),
                 winrt::to_string(net.Bssid()).c_str());
-    auto rssi = net.NetworkRssiInDecibelMilliwatts();
-    if (rssi) {
-        int32_t v = rssi.Value();
-        out.signal_dbm = v < -128 ? (int8_t)-128
-                                  : (v > 127 ? (int8_t)127 : (int8_t)v);
-    } else {
-        out.signal_dbm = 0; /* not reported */
-    }
+    /* NOTE (CI run 40329092476, SDK 10.0.26100): the C++/WinRT
+     * header projects NetworkRssiInDecibelMilliwatts as a plain
+     * int32_t, NOT as IReference<int32_t> — the IReference
+     * assumption failed compilation with MSVC C2228 ("left of
+     * '.Value' must have class/struct/union"). So there is no
+     * null case here: every scanned network reports an RSSI. If a
+     * future SDK changes the projection back to IReference, this
+     * line fails to compile loudly rather than misreading. */
+    int32_t v = net.NetworkRssiInDecibelMilliwatts();
+    out.signal_dbm = v < -128 ? (int8_t)-128
+                              : (v > 127 ? (int8_t)127 : (int8_t)v);
     uint32_t khz = net.ChannelCenterFrequencyInKilohertz();
     out.frequency_mhz = khz / 1000;
     out.channel = channel_from_mhz(out.frequency_mhz);
