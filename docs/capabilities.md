@@ -16,22 +16,24 @@ each backend reports exactly what it can do, and callers check
 
 ## Phase 1 matrix (verified by tests)
 
-| Feature | mock | linux | android stub | apple stub | windows stub |
-| ------- | ---- | ----- | ------------ | ---------- | ------------ |
-| BLE scan | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| BLE connect | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| BLE GATT | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| BLE notify | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| BLE pairing | NOT_SUPPORTED | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| BLE RSSI | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| BLE reconnect | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| Wi-Fi status | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| Wi-Fi scan | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| Wi-Fi connect | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| Wi-Fi quality | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
-| Wi-Fi saved networks | NOT_SUPPORTED | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED | NOT_SUPPORTED |
+| Feature | mock | linux | android stub | windows stub |
+| ------- | ---- | ----- | ------------ | ------------ |
+| BLE scan | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| BLE connect | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| BLE GATT | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| BLE notify | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| BLE pairing | NOT_SUPPORTED | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| BLE RSSI | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| BLE reconnect | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| Wi-Fi status | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| Wi-Fi scan | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| Wi-Fi connect | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| Wi-Fi quality | AVAILABLE | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
+| Wi-Fi saved networks | NOT_SUPPORTED | UNAVAILABLE | NOT_SUPPORTED | NOT_SUPPORTED |
 
 Notes:
+
+- Apple is out of scope since 2026-10-26: no Apple backend or bindings exist; the `RB_BACKEND_APPLE` enum value is retained only for ABI stability and always reports `NOT_SUPPORTED`.
 
 - Mock pairing/saved-networks are `NOT_SUPPORTED`, not `UNAVAILABLE`:
   there is no pairing or saved-network function in the Phase 1 API
@@ -53,7 +55,6 @@ Notes:
 - **Android**: Wi-Fi scanning is throttled and location-gated on
   modern versions; BLE scanning needs `BLUETOOTH_SCAN` (31+) or
   location (pre-31). Callbacks arrive on binder threads.
-- **Apple**: peripherals are identified by UUID, not MAC address;
   Wi-Fi current-network info is entitlement-gated; connection
   requests go through `NEHotspotConfiguration`.
 - **Linux/BlueZ**: GATT client paths are per-device object paths;

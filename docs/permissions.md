@@ -24,9 +24,6 @@ and a library that pops system dialogs is a liability.
   `BLUETOOTH_ADMIN` is legacy. Wi-Fi needs `ACCESS_WIFI_STATE` /
   `CHANGE_WIFI_STATE`; scanning is throttled and location-gated on
   modern versions.
-- **Apple**: `NSBluetoothAlwaysUsageDescription` for Bluetooth;
-  location usage descriptions where scanning needs them; Wi-Fi
-  current-network info needs entitlement + location on modern iOS.
 - **Windows**: the app declares the `bluetooth` capability; device
   access needs an explicit permission request before connection.
 - **Linux**: BlueZ/NetworkManager access is mediated by the system bus

@@ -13,9 +13,10 @@ backends own native handles and worker threads.
 - `src/wifi/` — mock Wi-Fi backend (full implementation).
 - `src/platform/linux/` — Linux backend: probe + D-Bus interface
   definitions + unavailable reporting (Phase 1/2 scope).
-- `src/platform/stubs/` — Android/Apple/Windows stubs (probe +
-  NOT_SUPPORTED only).
-- `src/platform/android|apple|windows/` — READMEs pointing at the
+- `src/platform/stubs/` — Android/Windows stubs (probe +
+  NOT_SUPPORTED only); Apple is retained only as an out-of-scope
+  entry for ABI stability (see `src/platform/stubs/rb_stubs.c`).
+- `src/platform/android|windows/` — READMEs pointing at the
   stub + the Phase 2/3 work each needs.
 - `src/events/`, `src/permissions/` — READMEs: the event system and
   permission reporting live in the core (`rb_core.c`) in Phase 1;
@@ -84,9 +85,6 @@ BlueZ errors map to the taxonomy: `org.bluez.Error.Failed` →
   platform's own ~7s queue wait), `AccessDenied` →
   `RB_ERROR_PERMISSION_DENIED`, `ProtocolError` →
   `RB_ERROR_INTERNAL`. No RSSI API exists: report `NOT_SUPPORTED`.
-- **Core Bluetooth**: `CBError` codes map similarly; `CBErrorPeerRemoved`
-  / `CBErrorConnectionTimeout` → `RB_ERROR_TIMEOUT`-family codes;
-  Bluetooth powered-off state → `RB_ERROR_UNAVAILABLE`.
 - **SimpleBLE lesson applied**: keep the error mapping in one table
   per backend, in the backend file, so a new platform error cannot
   silently become a generic failure.

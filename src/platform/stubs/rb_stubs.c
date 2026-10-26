@@ -1,5 +1,6 @@
 /*
- * RadioBridge — rb_stubs.c (Android / Apple / Windows backends)
+ * RadioBridge — rb_stubs.c (Android / Windows backends; Apple
+ * retained out-of-scope only, see below)
  *
  * Phase 1/2 scope: documented stubs, NOT implementations. Each stub
  * reports every feature as RB_CAP_NOT_SUPPORTED with a detail string
@@ -13,10 +14,10 @@
  *    bridge to BluetoothLeScanner / BluetoothGatt / WifiManager /
  *    ConnectivityManager. JNI patterns (global refs, thread attach)
  *    are sketched in bindings/android/jni/rb_jni.c.
- *  - Apple: Xcode + an Apple device/Mac; Core Bluetooth
- *    (CBCentralManager / CBPeripheral) and the Network framework
- *    (NWPathMonitor, NEHotspotConfiguration). ObjC/Swift wrappers are
- *    sketched in bindings/apple/.
+ *  - Apple: OUT OF SCOPE since 2026-10-26 (dropped from the
+ *    project). No Apple backend or bindings exist; apple_probe is
+ *    retained only so RB_BACKEND_APPLE keeps reporting
+ *    NOT_SUPPORTED for ABI stability.
  *  - Windows: Windows SDK + a Windows device; WinRT
  *    BluetoothLEAdvertisementWatcher / BluetoothLEDevice /
  *    GattDeviceService / GattCharacteristic, plus WLAN APIs. Known
@@ -65,9 +66,8 @@ static rb_status_t android_probe(rb_capabilities_t *caps) {
 static rb_status_t apple_probe(rb_capabilities_t *caps) {
     return stub_probe_named(
         "apple",
-        "apple backend: stub in Phase 1/2 scope — requires Xcode and an "
-        "Apple device/Mac for Core Bluetooth + Network framework; "
-        "no Apple SDK exists on this Linux VM",
+        "apple backend: OUT OF SCOPE since 2026-10-26 — no Apple "
+        "backend or bindings exist in this project",
         caps);
 }
 

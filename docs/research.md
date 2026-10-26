@@ -4,6 +4,10 @@ The Phase 1 API shape, capability model, error taxonomy, and backend
 structure were grounded in web research into the real platform APIs,
 not designed from memory. Key sources consulted:
 
+> Scope note (2026-10-26): Apple is out of scope — Apple sources
+> below are retained for reference only; no Apple backend or
+> bindings exist in this project.
+
 ## Linux — BlueZ (D-Bus)
 
 - Python/GIO BlueZ walkthrough (service `org.bluez`, Adapter1/Device1

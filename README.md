@@ -1,7 +1,7 @@
 # RadioBridge
 
 A cross-platform C library that unifies Bluetooth and Wi-Fi behind
-one developer API, with native bindings for Android, Apple, Windows,
+one developer API, with native bindings for Android, Windows,
 and Linux. One API, one capability model, one error taxonomy — the
 platform differences stay inside the backends, never in your code.
 
@@ -47,14 +47,14 @@ platform differences stay inside the backends, never in your code.
 
 - **Real radio backends on this build machine**: the machine has no
   Bluetooth hardware, no Wi-Fi tools, no D-Bus system bus, and no
-  platform SDKs (no Android SDK, no JDK, no Xcode, no Windows SDK).
+  platform SDKs (no Android SDK, no JDK, no Windows SDK).
   Real scan results or connections cannot be produced here, and the
   code refuses to fake them.
 - **Linux D-Bus transport** (Phase 2): the interface definitions are
   written and compiled in, but the transport (libdbus) is not linked
   yet. On a machine with bluetoothd + NetworkManager running, the
   backend still reports `UNAVAILABLE` until that transport lands.
-- **Android / Apple / Windows backends** (Phase 3): documented stubs
+- **Android / Windows backends** (Phase 3): documented stubs
   only, with skeleton bindings in `bindings/`. They report
   `NOT_SUPPORTED` and fail cleanly.
 - **Pairing and saved networks**: no API for them exists in Phase 1;
@@ -94,7 +94,7 @@ dependencies in Phase 1.
   implementation, hardware-gated integration tests, install targets
   and packaging.
 - **Phase 3 — Bindings**: real JNI/Java/Kotlin and ObjC/Swift
-  bindings, then the Android/Apple/Windows backends behind them.
+  bindings, then the Android/Windows backends behind them.
 - **Later**: pairing, saved networks, advanced features (mesh, BLE
   advertising, Wi-Fi Direct, coexistence) — only when the platform
   APIs support them honestly.
