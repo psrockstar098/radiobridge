@@ -185,7 +185,13 @@ static const rb_backend_ops_t *rb_ops_for_kind(rb_backend_kind_t kind) {
         case RB_BACKEND_LINUX: return &rb_linux_backend_ops;
         case RB_BACKEND_ANDROID: return &rb_android_stub_backend_ops;
         case RB_BACKEND_APPLE: return &rb_apple_stub_backend_ops;
+#ifdef _WIN32
+        /* Real WinRT backend on Windows; the stub remains for
+         * non-Windows builds, where Windows APIs cannot exist. */
+        case RB_BACKEND_WINDOWS: return &rb_windows_backend_ops;
+#else
         case RB_BACKEND_WINDOWS: return &rb_windows_stub_backend_ops;
+#endif
         case RB_BACKEND_AUTO:
         default: return NULL; /* resolved by the caller */
     }
@@ -234,6 +240,21 @@ rb_status_t rb_initialize(const rb_config_t *config,
             rb_logf(ctx, RB_LOG_WARN, "core",
                     "native linux backend unavailable (%s); falling back "
                     "to mock backend",
+                    rb_status_string(st));
+            ctx->ops = NULL;
+            ctx->backend_state = NULL;
+            ops = &rb_mock_backend_ops;
+            ctx->ops = ops;
+            st = ops->create(ctx);
+        }
+#elif defined(_WIN32)
+        ops = &rb_windows_backend_ops;
+        ctx->ops = ops;
+        st = ops->create(ctx);
+        if (st != RB_OK) {
+            rb_logf(ctx, RB_LOG_WARN, "core",
+                    "native windows backend unavailable (%s); falling "
+                    "back to mock backend",
                     rb_status_string(st));
             ctx->ops = NULL;
             ctx->backend_state = NULL;
@@ -315,6 +336,45 @@ rb_status_t rb_get_capabilities(rb_context_t *context,
     }
     *out_caps = context->caps;
     rb_mutex_unlock(&context->lock);
+    return RB_OK;
+}
+
+rb_status_t rb_get_diagnostics(rb_context_t *context,
+                               rb_diagnostics_t *out) {
+    if (context == NULL || out == NULL)
+        return RB_ERROR_INVALID_ARGUMENT;
+    rb_mutex_lock(&context->lock);
+    if (context->shutting_down) {
+        rb_mutex_unlock(&context->lock);
+        return RB_ERROR_NOT_INITIALIZED;
+    }
+    rb_capabilities_t caps = context->caps;
+    const rb_backend_ops_t *ops = context->ops;
+    rb_mutex_unlock(&context->lock);
+    memset(out, 0, sizeof(*out));
+    rb_copy_str(out->backend_name, sizeof(out->backend_name),
+                caps.backend_name);
+    rb_copy_str(out->backend_version, sizeof(out->backend_version),
+                caps.backend_version);
+    rb_copy_str(out->os_name, sizeof(out->os_name), caps.os_name);
+    rb_copy_str(out->bus_address, sizeof(out->bus_address), "none");
+    out->bluez_present = -1;
+    out->nm_present = -1;
+    out->adapter_powered = -1;
+    if (ops != NULL && ops->diagnostics != NULL) {
+        rb_status_t st = ops->diagnostics(context, out);
+        if (st != RB_OK) return st;
+        /* The hook fills backend fields; generic identity always
+         * comes from the capabilities snapshot. */
+        rb_copy_str(out->backend_name, sizeof(out->backend_name),
+                    caps.backend_name);
+        rb_copy_str(out->backend_version, sizeof(out->backend_version),
+                    caps.backend_version);
+        rb_copy_str(out->os_name, sizeof(out->os_name), caps.os_name);
+        return RB_OK;
+    }
+    rb_copy_str(out->detail, sizeof(out->detail),
+                "diagnostics not reported by this backend");
     return RB_OK;
 }
 

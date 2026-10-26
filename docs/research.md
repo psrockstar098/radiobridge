@@ -83,6 +83,38 @@ not designed from memory. Key sources consulted:
   https://deepwiki.com/simpleble/simpleble/3.4-android-backend
   https://deepwiki.com/simpleble/simpleble/4-build-system
 
+## Windows (WinRT) — full source list
+
+The complete per-API source list for the Windows backend lives in
+`src/platform/windows/rb_windows_errors.md` (verbatim
+learn.microsoft.com URLs): GATT client, BLE advertisement watcher
++ scanning mode, `BluetoothLEDevice`, `DeviceInformation`,
+`GattSession.MaintainConnection`, `GattCharacteristicProperties`,
+device pairing (including `Custom.PairAsync` +
+`PairingRequested`), `WiFiAdapter`, `WiFiAvailableNetwork`.
+Headline limits confirmed from those docs: no explicit disconnect,
+no RSSI read, no MTU request, ~7s per queued GATT request,
+non-cancellable connects, `wifiControl` manifest capability
+gating Wi-Fi access.
+
+## Phase 5 — application layer
+
+- SHA-256 (FIPS 180-4) — the firmware-transport hash
+  implementation follows the standard's compression function and
+  is verified against the NIST test vectors ("" and "abc") in
+  `test_app`.
+- OpenSSL EVP: X25519 key generation/agreement
+  (`EVP_PKEY_X25519`), HKDF-SHA256 (`EVP_PKEY_HKDF`), AES-256-GCM
+  (`EVP_aes_256_gcm`) — the secure channel uses only these
+  primitives, never hand-rolled crypto.
+- NetworkManager settings D-Bus format (`a{sa{sv}}` — section
+  name → plain `a{sv}` array, NOT a variant): the backend's
+  `AddAndActivateConnection` settings dict follows this exactly;
+  an earlier version wrapped sections in variants and libdbus
+  aborted the process on the type mismatch.
+- BlueZ `a{qay}` ManufacturerData values are plain byte arrays,
+  not variants — same lesson, same fix, on the parse side.
+
 ## What the research changed in the design
 
 - The capability model exists because no two platforms expose the

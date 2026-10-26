@@ -15,6 +15,7 @@
 #include "core/rb_thread.h"
 
 #include "radiobridge/rb.h"
+#include "radiobridge/rb_diagnostics.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -106,6 +107,10 @@ struct rb_backend_ops {
                                            const rb_device_id_t *dev);
     rb_status_t (*mock_trigger_wifi_change)(rb_context_t *ctx,
                                             rb_wifi_state_t state);
+
+    /* Diagnostics hook (NULL = backend reports nothing beyond the
+     * capabilities snapshot; core fills "not reported" fields). */
+    rb_status_t (*diagnostics)(rb_context_t *ctx, rb_diagnostics_t *out);
 };
 
 /* Backend registry entries (defined by each backend's .c file). */
@@ -114,6 +119,9 @@ extern const rb_backend_ops_t rb_linux_backend_ops;
 extern const rb_backend_ops_t rb_android_stub_backend_ops;
 extern const rb_backend_ops_t rb_apple_stub_backend_ops;
 extern const rb_backend_ops_t rb_windows_stub_backend_ops;
+/* Real Windows backend (src/platform/windows/, C++/WinRT). Defined
+ * only on Windows builds; other platforms keep the stub above. */
+extern const rb_backend_ops_t rb_windows_backend_ops;
 
 /* Direct probe entry points (used by tests and by rb_initialize). */
 rb_status_t rb_linux_probe(rb_capabilities_t *caps);

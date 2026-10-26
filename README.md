@@ -1,11 +1,15 @@
 # RadioBridge
 
 A cross-platform C library that unifies Bluetooth and Wi-Fi behind
-one developer API, with native bindings for Android, Windows,
-and Linux. One API, one capability model, one error taxonomy — the
-platform differences stay inside the backends, never in your code.
+one developer API, with native backends for Linux (BlueZ +
+NetworkManager over D-Bus) and Windows (WinRT, compile-unverified),
+a JNI binding for Android, and one capability model, one error
+taxonomy — the platform differences stay inside the backends, never
+in your code.
 
-**Version 0.1.0 — Phase 1 (Foundation).**
+**Version 0.1.0 released; main carries Phases 2–5 toward 0.2.0
+(unreleased).** Apple is out of scope since 2026-10-26 (see
+`docs/capabilities.md`).
 
 ## What works today (proven, tested)
 
@@ -36,29 +40,79 @@ platform differences stay inside the backends, never in your code.
   interface definitions, plus an honest probe that reports
   `UNAVAILABLE` with a clean error when the platform service is
   absent. It fabricates nothing.
-- 12 CTest tests, all passing, covering lifecycle, capabilities,
+- The Linux backend, fully implemented over libdbus (Phase 2):
+  BlueZ adapter/device/GATT + NetworkManager Wi-Fi, verified
+  against a fake BlueZ + NetworkManager service on a private
+  D-Bus daemon — genuine protocol verification with no hardware
+  (`tests/test_linux_bus`, `tests/fake_bus/`). Documented v0.2
+  simplifications live in `docs/backends.md` (snapshot scans,
+  synthetic GATT handles, poll-based notify, no fabricated dBm).
+- Platform diagnostics + compatibility reporting (Phase 4 Linux):
+  `rb_get_diagnostics()` reports backend, bus address, BlueZ /
+  NetworkManager presence, adapter path/address/power, Wi-Fi
+  device path, and a compatibility string.
+- The Windows backend, written in full from documented WinRT APIs
+  (Phase 4): BLE advertisement scan, connect, GATT, notify,
+  pairing, Wi-Fi status/scan/connect. **Compile-unverified**: it
+  has never been compiled (no Windows SDK on the authoring
+  machine) and needs a Windows SDK + Bluetooth-capable Windows
+  device to verify. Details + limits: `src/platform/windows/`.
+- The Android JNI bridge + Java/Kotlin wrappers (Phase 3):
+  compiled against a plain JDK and proven by a real JVM smoke test
+  (`test_jni_smoke`) that loads the built library and drives the
+  mock backend end to end (scan/connect/read). The Java helper
+  that would call Android Framework APIs still needs an Android
+  SDK + device (see `bindings/android/README.md`).
+- The application layer (Phase 5, `include/radiobridge/rb_app.h`):
+  device registry + capability profiles (JSON), reliable data
+  transfer (framing, sequencing, retries, CRC32), firmware update
+  transport (chunked, per-chunk SHA-256, manifest hash),
+  OpenSSL-backed secure channels (X25519 + HKDF-SHA256 +
+  AES-256-GCM; `NOT_SUPPORTED` without OpenSSL — never
+  hand-rolled crypto claimed as secure), multi-device sessions,
+  operation scheduling, power-aware config, connection policy
+  engine.
+- A cross-platform conformance suite (`tests/test_conformance.c`
+  + `tests/run_conformance.sh`): the same scripted sequence
+  against the mock backend and the Linux fake-bus backend,
+  asserting equivalent behavior and documenting divergences.
+- 16 CTest tests, all passing, covering lifecycle, capabilities,
   mock BLE scan/filter/connect/GATT/notify, mock Wi-Fi
   status/scan/connect, cancellation, error paths, callback
   threading, logging (including "passwords are never logged"),
-  permissions, the Linux backend contract, and mock hooks.
+  permissions, the Linux backend contract, mock hooks, the
+  application layer, the Linux fake-bus backend, conformance,
+  and the JNI smoke test.
 - Two C examples (`examples/c/ble_scan.c`, `examples/c/wifi_status.c`).
 
 ## What is honestly unavailable, and why
 
-- **Real radio backends on this build machine**: the machine has no
-  Bluetooth hardware, no Wi-Fi tools, no D-Bus system bus, and no
-  platform SDKs (no Android SDK, no JDK, no Windows SDK).
-  Real scan results or connections cannot be produced here, and the
-  code refuses to fake them.
-- **Linux D-Bus transport** (Phase 2): the interface definitions are
-  written and compiled in, but the transport (libdbus) is not linked
-  yet. On a machine with bluetoothd + NetworkManager running, the
-  backend still reports `UNAVAILABLE` until that transport lands.
-- **Android / Windows backends** (Phase 3): documented stubs
-  only, with skeleton bindings in `bindings/`. They report
-  `NOT_SUPPORTED` and fail cleanly.
-- **Pairing and saved networks**: no API for them exists in Phase 1;
-  they are reported `NOT_SUPPORTED`, not "temporarily missing".
+- **Real radio hardware on this build machine**: the machine has no
+  Bluetooth hardware, no Wi-Fi radio, no bluetoothd /
+  NetworkManager services, and no system bus. The Linux backend is
+  verified against a fake service over the real D-Bus protocol
+  (not a mock shortcut), but a run against real radios on real
+  hardware is still the remaining verification step.
+- **Windows backend compilation** (Phase 4): written as completely
+  as possible from documented WinRT APIs, but never compiled here
+  (no Windows SDK). It stays marked compile-unverified until it
+  builds on Windows and runs on a Bluetooth-capable device.
+- **Android Framework backend** (Phase 3): the JNI bridge, Java /
+  Kotlin wrappers, and JVM smoke test are compiled and proven, but
+  the Java helper that calls `BluetoothLeScanner` /
+  `BluetoothGatt` / `WifiManager` needs an Android SDK + device
+  and does not exist yet. The Android backend itself still reports
+  `NOT_SUPPORTED`.
+- **Apple** (was Phase 3): out of scope since 2026-10-26. No Apple
+  backend or bindings exist; `RB_BACKEND_APPLE` is retained only
+  for ABI stability and always reports `NOT_SUPPORTED`.
+- **Secure channels without OpenSSL**: the secure-channel functions
+  return `NOT_SUPPORTED` when built without OpenSSL. No hand-rolled
+  crypto is ever presented as secure.
+- **Pairing and saved networks**: per-backend, see the capability
+  matrix in `docs/capabilities.md` — they are reported
+  `NOT_SUPPORTED` where no platform API exists, not "temporarily
+  missing".
 
 ## Build, run, test
 
@@ -71,32 +125,44 @@ ctest --test-dir build --output-on-failure
 ./build/examples/example_wifi_status
 ```
 
-Requirements: C11 compiler, CMake 3.16+, pthreads. No other
-dependencies in Phase 1.
+Requirements: C11 compiler, CMake 3.16+, pthreads. Optional, each
+enabling its feature and cleanly absent otherwise: libdbus-1-dev
+(Linux D-Bus transport + fake-bus test), a JDK with `javac`/`java`
+(JNI bridge + smoke test; headless JDKs work — only `jni.h` is
+needed, never AWT), OpenSSL (secure channels).
 
 ## Real-hardware try-out (when you have a machine with radios)
 
 1. Build and run the mock examples first — they prove the API shape
    without hardware.
-2. For Linux Phase 2: install `bluez` + `NetworkManager` + libdbus
-   dev headers, make sure `bluetoothd` and NetworkManager are
-   running, then follow the Phase 2 checklist in
-   `docs/backends.md`.
+2. For Linux: install `bluez` + `NetworkManager` + libdbus dev
+   headers, make sure `bluetoothd` and NetworkManager are running,
+   then run the suite — the Linux backend talks to the real
+   services, and `test_linux_bus` proves the same code against the
+   fake service first.
 3. Hardware tests are gated: they skip, never fake, when no adapter
    is present (see `docs/testing.md`).
 
 ## Roadmap
 
-- **Phase 1 — Foundation (done)**: C11 API, capability model, async
-  events, permission reporting, mock backends, Linux structure,
-  documented stubs, CTest suite, docs.
-- **Phase 2 — Linux transport**: real BlueZ + NetworkManager D-Bus
-  implementation, hardware-gated integration tests, install targets
-  and packaging.
-- **Phase 3 — Bindings**: real JNI/Java/Kotlin and ObjC/Swift
-  bindings, then the Android/Windows backends behind them.
-- **Later**: pairing, saved networks, advanced features (mesh, BLE
-  advertising, Wi-Fi Direct, coexistence) — only when the platform
+- **Phase 1 — Foundation (done, v0.1.0)**: C11 API, capability
+  model, async events, permission reporting, mock backends, Linux
+  structure, documented stubs, CTest suite, docs.
+- **Phase 2 — Linux transport (done, fake-bus verified)**: real
+  BlueZ + NetworkManager D-Bus implementation, fake-service
+  protocol verification, diagnostics. Real-hardware run still open.
+- **Phase 3 — Bindings (JNI done, Framework helper blocked)**:
+  compiled JNI/Java/Kotlin + JVM smoke test; Android Framework
+  backend needs an Android SDK + device.
+- **Phase 4 — Expansion (Linux done, Windows compile-unverified)**:
+  diagnostics + compatibility reporting; full WinRT backend
+  written, needs Windows SDK + device to compile and verify.
+- **Phase 5 — Application layer (done, mock + fake-bus verified)**:
+  registry/profiles, reliable transfer, firmware transport,
+  OpenSSL secure channels, sessions, scheduler, power config,
+  policy engine, conformance suite.
+- **Later**: pairing/saved-network expansion, mesh, BLE
+  advertising, Wi-Fi Direct, coexistence — only when the platform
   APIs support them honestly.
 
 ## Docs

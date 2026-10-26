@@ -1055,6 +1055,25 @@ static rb_status_t mock_required_permissions(rb_operation_t op,
     return RB_OK;
 }
 
+static rb_status_t mock_diagnostics(rb_context_t *ctx,
+                                    rb_diagnostics_t *out) {
+    if (!ctx || !out) return RB_ERROR_INVALID_ARGUMENT;
+    rb_copy_str(out->bus_address, sizeof(out->bus_address),
+                "none (mock backend)");
+    out->bluez_present = -1;
+    out->nm_present = -1;
+    out->adapter_powered = -1;
+    rb_copy_str(out->compatibility, sizeof(out->compatibility),
+                "Mock backend: deterministic fake radios, no hardware. "
+                "BLE scan delivers 3 canned devices; Wi-Fi scan "
+                "delivers 3 canned networks; quality values are "
+                "simulated from signal strength; notifications fire "
+                "on a ~300 ms cadence; drops are test-triggered.");
+    rb_copy_str(out->detail, sizeof(out->detail),
+                "mock backend: no bus, no hardware, fully simulated");
+    return RB_OK;
+}
+
 const rb_backend_ops_t rb_mock_backend_ops = {
     .name = "mock",
     .version = "0.1.0",
@@ -1081,4 +1100,5 @@ const rb_backend_ops_t rb_mock_backend_ops = {
     .required_permissions = mock_required_permissions,
     .mock_trigger_disconnect = mock_trigger_disconnect,
     .mock_trigger_wifi_change = rb_mock_wifi_trigger_change,
+    .diagnostics = mock_diagnostics,
 };

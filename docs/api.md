@@ -2,7 +2,9 @@
 
 Version 0.1.0. Headers: `include/radiobridge/rb.h` (umbrella +
 lifecycle), `rb_types.h` (data model), `rb_bluetooth.h`,
-`rb_wifi.h`, `rb_errors.h`. Test-only mock hooks live in `rb_mock.h`
+`rb_wifi.h`, `rb_errors.h`, `rb_diagnostics.h` (Phase 4:
+`rb_get_diagnostics()`), `rb_app.h` (Phase 5 application layer).
+Test-only mock hooks live in `rb_mock.h`
 and are NOT part of the stable ABI.
 
 ## Lifecycle
@@ -83,6 +85,33 @@ connect delivers a `FAILED` event with `RB_ERROR_CANCELLED`.
 | `RB_ERROR_BUSY` | backend busy (e.g. out of scan resources) |
 | `RB_ERROR_AUTH_FAILED` | pairing / Wi-Fi auth failed |
 | `RB_ERROR_INTERNAL` | backend bug or unexpected native error |
+
+## Application layer (Phase 5, `rb_app.h`)
+
+Building blocks on top of the portable API, backend-agnostic:
+
+- **Registry + profiles**: `rb_registry_*` — in-memory device
+  profiles (id, name, address, RSSI, services, notes) with a JSON
+  file round-trip (`rb_registry_save` / `rb_registry_load`).
+- **Reliable transfer**: `rb_rt_*` — SOH/length/sequence/CRC32
+  framing, 200-byte payloads, stop-and-wait retries (5 attempts,
+  200 ms ACK timeout), receiver dedup. Sequences are persistent
+  per sender/receiver pair and never restart per message.
+- **Firmware transport**: `rb_fw_*` — 512-byte chunks, per-chunk
+  SHA-256, manifest hash; corrupt chunks are rejected and may be
+  re-sent; out-of-order chunks reassemble by index.
+- **Secure channels**: `rb_secure_*` — X25519 ECDH → HKDF-SHA256
+  → AES-256-GCM via OpenSSL EVP, nonce-sequence replay rejection.
+  Without OpenSSL every function returns `NOT_SUPPORTED`.
+- **Sessions**: `rb_session_*` — connect-all with per-device
+  results, broadcast write, disconnect-all over up to 8 devices.
+- **Scheduler**: `rb_scheduler_*` — priority queue, single-flight
+  execution, per-item intervals.
+- **Power config**: `rb_power_config_*` — balanced / low-power /
+  performance presets + validation (window ≤ interval).
+- **Policy engine**: `rb_policy_*` — preferred/block lists,
+  RSSI floor, required services → ranked devices (registry-known
+  devices get a bonus).
 
 ## Async vs sync surface
 

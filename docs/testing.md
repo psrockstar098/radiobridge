@@ -8,9 +8,9 @@ cmake --build build -j1
 ctest --test-dir build --output-on-failure
 ```
 
-12 CTest entries, all passing on the Phase 1 build machine (no radios,
-no SDKs). Total runtime ~20s; the BLE scan test dominates (it runs
-eight scans to cover every filter).
+16 CTest entries, all passing on the build machine (no radios, no
+SDKs). Total runtime ~60s; the conformance suite dominates (two
+10-second scans per backend).
 
 ## Suite layout
 
@@ -28,6 +28,23 @@ eight scans to cover every filter).
 | `test_permissions` | masks + names per operation, count query, invalid inputs |
 | `test_linux_backend` | probe detail paths, all-UNAVAILABLE contract, explicit init failure |
 | `test_mock_hooks` | simulated drops, reconnect policy (enabled + disabled) |
+| `test_app` | Phase 5: registry JSON round-trip, lossy-link reliable transfer (drop/dup/corrupt), firmware chunks + corrupt rejection, OpenSSL secure channels (round-trip, tamper, replay, wrong-key), multi-device sessions, scheduler, power config, policy ranking |
+| `test_linux_bus` | Phase 2: fake BlueZ + NetworkManager service on a private bus — caps, diagnostics, BLE scan filters, connect/discover/read/write/notify/RSSI/disconnect, Wi-Fi status/scan/connect/disconnect, quality probes |
+| `test_conformance` | Phase 5: same scripted sequence against mock + Linux fake-bus backends (shapes, not raw counts; documented divergences asserted per backend) |
+| `test_jni_smoke` | Phase 3: JVM loads the built JNI library, drives the mock backend end to end (scan/connect/read) |
+
+## Fake-bus verification (Phase 2, no hardware needed)
+
+`tests/fake_bus/fake_bus.c` owns `org.bluez` and
+`org.freedesktop.NetworkManager` on a private `dbus-daemon` bus
+(address from `RB_DBUS_ADDRESS`) and exposes the real interfaces
+with canned devices (adapter `00:11:22:33:44:55`, heart + thermo
+devices with GATT services) and networks (open + WPA2 APs, IP
+config). `test_linux_bus` drives the backend against it over the
+real D-Bus protocol. The fake service is a test tool, not part of
+the library, and its data is labeled fake everywhere. A run
+against real radios on real hardware is still the remaining
+verification step — the fake-bus run does not claim to replace it.
 
 ## Mock catalog (deterministic, fake by design)
 
@@ -43,8 +60,9 @@ eight scans to cover every filter).
 ## Hardware gating policy (SimpleBLE lesson)
 
 Integration and hardware tests must **skip, never fake**, when the
-hardware is absent. The Phase 1 suite runs entirely on mocks, so it
-passes everywhere. Phase 2 adds a hardware-gated test that:
+hardware is absent. The suite runs on mocks and the fake bus, so it
+passes everywhere without radios. A future hardware-gated test
+must:
 
 1. Probes for a real adapter (BlueZ adapter dir + daemon).
 2. Skips with a clear message when absent.

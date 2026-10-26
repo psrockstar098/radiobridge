@@ -26,6 +26,11 @@ and a library that pops system dialogs is a liability.
   modern versions.
 - **Windows**: the app declares the `bluetooth` capability; device
   access needs an explicit permission request before connection.
+  Wi-Fi additionally needs the `wifiControl` manifest capability:
+  without it, `RequestAccessAsync` returns `DeniedBySystem` and
+  Wi-Fi reports `REQUIRES_PERMISSION` / `PERMISSION_DENIED`
+  (see `docs/capabilities.md` and
+  `src/platform/windows/rb_windows_errors.md`).
 - **Linux**: BlueZ/NetworkManager access is mediated by the system bus
   policy and PolicyKit; a denied call surfaces as
   `RB_ERROR_PERMISSION_DENIED`, never as a silent empty result.

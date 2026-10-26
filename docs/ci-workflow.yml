@@ -30,6 +30,24 @@ jobs:
       - name: Check out
         uses: actions/checkout@v4
 
+      # Ubuntu only: the Linux D-Bus backend + fake-bus test need
+      # libdbus headers, and the tests need a dbus-daemon + dbus-send
+      # (the `dbus` package). Without these, CMake silently disables
+      # the transport and the bus test is not built at all — the
+      # suite would stay green while skipping the Phase 2 proof, so
+      # these steps are REQUIRED, not optional. macOS/Windows jobs
+      # do not need them (DBUS/JNI are gated off there by CMake).
+      # JDK: GitHub's ubuntu/macos runners preinstall a JDK
+      # (JAVA_HOME set), which is what the JNI bridge needs; if a
+      # runner ever lacks one, add actions/setup-java@v4 (Temurin 21)
+      # here — the bridge is skipped, never failed, without it.
+      # OpenSSL: preinstalled on ubuntu runners; if ever absent, the
+      # secure-channel tests take their NOT_SUPPORTED branch and
+      # still pass.
+      - name: Install Linux deps (ubuntu only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libdbus-1-dev dbus
+
       - name: Configure (CMake)
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
