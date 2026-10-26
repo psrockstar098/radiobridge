@@ -952,7 +952,7 @@ rb_status_t rb_mock_probe(rb_capabilities_t *caps) {
     memset(caps, 0, sizeof(*caps));
     rb_copy_str(caps->backend_name, sizeof(caps->backend_name), "mock");
     rb_copy_str(caps->backend_version, sizeof(caps->backend_version),
-                "0.1.0");
+                "0.2.0");
     rb_copy_str(caps->os_name, sizeof(caps->os_name), "mock");
     caps->ble.scan = RB_CAP_AVAILABLE;
     caps->ble.connect = RB_CAP_AVAILABLE;
@@ -1076,7 +1076,7 @@ static rb_status_t mock_diagnostics(rb_context_t *ctx,
 
 const rb_backend_ops_t rb_mock_backend_ops = {
     .name = "mock",
-    .version = "0.1.0",
+    .version = "0.2.0",
     .probe = rb_mock_probe,
     .create = mock_create,
     .destroy = mock_destroy,

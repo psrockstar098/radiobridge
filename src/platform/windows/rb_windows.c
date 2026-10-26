@@ -195,7 +195,7 @@ static rb_status_t windows_required_permissions(rb_operation_t op,
 
 const rb_backend_ops_t rb_windows_backend_ops = {
     .name = "windows",
-    .version = "0.1.0",
+    .version = "0.2.0",
     .probe = windows_probe,
     .create = windows_create,
     .destroy = windows_destroy,

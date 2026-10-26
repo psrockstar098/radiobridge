@@ -141,7 +141,7 @@ rb_status_t rb_linux_probe(rb_capabilities_t *caps) {
     memset(caps, 0, sizeof(*caps));
     rb_copy_str(caps->backend_name, sizeof(caps->backend_name), "linux");
     rb_copy_str(caps->backend_version, sizeof(caps->backend_version),
-                "0.1.0");
+                "0.2.0");
     rb_copy_str(caps->os_name, sizeof(caps->os_name), "linux");
     caps->ble.scan = RB_CAP_UNAVAILABLE;
     caps->ble.connect = RB_CAP_UNAVAILABLE;
@@ -686,7 +686,7 @@ static void linux_fill_caps(rb_capabilities_t *caps, int bluez,
     memset(caps, 0, sizeof(*caps));
     rb_copy_str(caps->backend_name, sizeof(caps->backend_name), "linux");
     rb_copy_str(caps->backend_version, sizeof(caps->backend_version),
-                "0.1.0");
+                "0.2.0");
     rb_copy_str(caps->os_name, sizeof(caps->os_name), "linux");
     rb_cap_state_t bt = bluez ? RB_CAP_AVAILABLE : RB_CAP_UNAVAILABLE;
     rb_cap_state_t wf = nm ? RB_CAP_AVAILABLE : RB_CAP_UNAVAILABLE;
@@ -2156,7 +2156,7 @@ static rb_status_t linux_required_permissions(rb_operation_t op,
 
 const rb_backend_ops_t rb_linux_backend_ops = {
     .name = "linux",
-    .version = "0.1.0",
+    .version = "0.2.0",
     .probe = rb_linux_probe,
     .create = linux_create,
     .destroy = linux_destroy,
@@ -2244,7 +2244,7 @@ static rb_status_t linux_fb_required_permissions(rb_operation_t op, rb_permissio
 
 const rb_backend_ops_t rb_linux_backend_ops = {
     .name = "linux",
-    .version = "0.1.0",
+    .version = "0.2.0",
     .probe = rb_linux_probe,
     .create = linux_fb_create,
     .destroy = linux_fb_destroy,

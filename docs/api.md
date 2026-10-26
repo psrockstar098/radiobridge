@@ -1,6 +1,6 @@
 # RadioBridge public API contract
 
-Version 0.1.0. Headers: `include/radiobridge/rb.h` (umbrella +
+Version 0.2.0. Headers: `include/radiobridge/rb.h` (umbrella +
 lifecycle), `rb_types.h` (data model), `rb_bluetooth.h`,
 `rb_wifi.h`, `rb_errors.h`, `rb_diagnostics.h` (Phase 4:
 `rb_get_diagnostics()`), `rb_app.h` (Phase 5 application layer).
@@ -31,7 +31,7 @@ unavailable. An explicitly requested backend that cannot run fails
 - Strings are UTF-8, NUL-terminated, inside fixed buffers.
 - Error codes are appended only, never renumbered
   (`rb_status_string()` is stable).
-- Version: `rb_version_string()` (`"0.1.0"`), `rb_abi_version()`
+- Version: `rb_version_string()` (`"0.2.0"`), `rb_abi_version()`
   (packed major/minor/patch).
 
 ## Ownership and lifetimes

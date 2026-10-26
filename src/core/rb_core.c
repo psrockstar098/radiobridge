@@ -395,7 +395,7 @@ rb_status_t rb_cancel(rb_context_t *context, rb_operation_id_t operation) {
 }
 
 const char *rb_version_string(void) {
-    return "0.1.0";
+    return "0.2.0";
 }
 
 uint32_t rb_abi_version(void) {

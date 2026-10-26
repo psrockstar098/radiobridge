@@ -14,7 +14,7 @@ int main(void) {
     CHECK(strcmp(caps.backend_name, "mock") == 0);
 
     /* Version surface. */
-    CHECK(strcmp(rb_version_string(), "0.1.0") == 0);
+    CHECK(strcmp(rb_version_string(), "0.2.0") == 0);
     CHECK(rb_abi_version() == RB_API_VERSION);
     CHECK_ST(rb_get_capabilities(NULL, &caps), RB_ERROR_INVALID_ARGUMENT);
     CHECK_ST(rb_get_capabilities(ctx, NULL), RB_ERROR_INVALID_ARGUMENT);

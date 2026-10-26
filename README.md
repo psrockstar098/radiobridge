@@ -2,14 +2,13 @@
 
 A cross-platform C library that unifies Bluetooth and Wi-Fi behind
 one developer API, with native backends for Linux (BlueZ +
-NetworkManager over D-Bus) and Windows (WinRT, compile-unverified),
-a JNI binding for Android, and one capability model, one error
-taxonomy — the platform differences stay inside the backends, never
-in your code.
+NetworkManager over D-Bus) and Windows (WinRT, compile-verified by
+CI, runtime-unverified), a JNI binding for Android, and one
+capability model, one error taxonomy — the platform differences stay
+inside the backends, never in your code.
 
-**Version 0.1.0 released; main carries Phases 2–5 toward 0.2.0
-(unreleased).** Apple is out of scope since 2026-10-26 (see
-`docs/capabilities.md`).
+**Version 0.2.0** — Phases 2–5 landed (see Roadmap). Apple is out
+of scope since 2026-10-26 (see `docs/capabilities.md`).
 
 ## What works today (proven, tested)
 
@@ -154,9 +153,11 @@ needed, never AWT), OpenSSL (secure channels).
 - **Phase 3 — Bindings (JNI done, Framework helper blocked)**:
   compiled JNI/Java/Kotlin + JVM smoke test; Android Framework
   backend needs an Android SDK + device.
-- **Phase 4 — Expansion (Linux done, Windows compile-unverified)**:
+- **Phase 4 — Expansion (Linux done, Windows compile-verified by
+  CI, runtime-unverified)**:
   diagnostics + compatibility reporting; full WinRT backend
-  written, needs Windows SDK + device to compile and verify.
+  written and compiling on MSVC + Windows SDK in CI, needs a
+  Windows device with radios to verify at runtime.
 - **Phase 5 — Application layer (done, mock + fake-bus verified)**:
   registry/profiles, reliable transfer, firmware transport,
   OpenSSL secure channels, sessions, scheduler, power config,

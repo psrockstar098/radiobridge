@@ -76,7 +76,7 @@ rb_status_t rb_get_required_permissions(rb_context_t *context,
                                         char (*out_names)[32],
                                         size_t *out_count);
 
-/* Runtime version strings. rb_version_string() returns e.g. "0.1.0". */
+/* Runtime version strings. rb_version_string() returns e.g. "0.2.0". */
 const char *rb_version_string(void);
 uint32_t rb_abi_version(void);
 

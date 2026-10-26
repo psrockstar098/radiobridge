@@ -36,7 +36,7 @@ static rb_status_t stub_probe_named(const char *name, const char *detail,
     memset(caps, 0, sizeof(*caps));
     rb_copy_str(caps->backend_name, sizeof(caps->backend_name), name);
     rb_copy_str(caps->backend_version, sizeof(caps->backend_version),
-                "0.1.0");
+                "0.2.0");
     rb_copy_str(caps->os_name, sizeof(caps->os_name), name);
     caps->ble.scan = RB_CAP_NOT_SUPPORTED;
     caps->ble.connect = RB_CAP_NOT_SUPPORTED;
@@ -99,7 +99,7 @@ static rb_status_t stub_permissions(rb_operation_t op,
 
 const rb_backend_ops_t rb_android_stub_backend_ops = {
     .name = "android",
-    .version = "0.1.0",
+    .version = "0.2.0",
     .probe = android_probe,
     .create = stub_create,
     .destroy = stub_destroy,
@@ -108,7 +108,7 @@ const rb_backend_ops_t rb_android_stub_backend_ops = {
 
 const rb_backend_ops_t rb_apple_stub_backend_ops = {
     .name = "apple",
-    .version = "0.1.0",
+    .version = "0.2.0",
     .probe = apple_probe,
     .create = stub_create,
     .destroy = stub_destroy,
@@ -117,7 +117,7 @@ const rb_backend_ops_t rb_apple_stub_backend_ops = {
 
 const rb_backend_ops_t rb_windows_stub_backend_ops = {
     .name = "windows",
-    .version = "0.1.0",
+    .version = "0.2.0",
     .probe = windows_probe,
     .create = stub_create,
     .destroy = stub_destroy,

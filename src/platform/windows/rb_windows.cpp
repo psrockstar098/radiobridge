@@ -353,7 +353,7 @@ static void probe_work(SharedState *st, void *arg) {
     memset(&caps, 0, sizeof(caps));
     rb_copy_str(caps.backend_name, sizeof(caps.backend_name), "windows");
     rb_copy_str(caps.backend_version, sizeof(caps.backend_version),
-                "0.1.0");
+                "0.2.0");
     rb_copy_str(caps.os_name, sizeof(caps.os_name), "windows");
 
     int ble_ok = 0;
@@ -443,7 +443,7 @@ extern "C" rb_status_t rb_win_probe(rb_capabilities_t *caps) {
     memset(caps, 0, sizeof(*caps));
     rb_copy_str(caps->backend_name, sizeof(caps->backend_name), "windows");
     rb_copy_str(caps->backend_version, sizeof(caps->backend_version),
-                "0.1.0");
+                "0.2.0");
     rb_copy_str(caps->os_name, sizeof(caps->os_name), "windows");
     caps->ble.scan = RB_CAP_UNAVAILABLE;
     caps->ble.connect = RB_CAP_UNAVAILABLE;
