@@ -212,7 +212,12 @@ static void json_escape(FILE *f, const char *s) {
 
 rb_status_t rb_registry_save(rb_registry_t *reg, const char *path) {
     if (reg == NULL || path == NULL) return RB_ERROR_INVALID_ARGUMENT;
-    FILE *f = fopen(path, "w");
+    /* Binary mode on purpose: the loader sizes the file with
+     * ftell, and in Windows text mode "\n" written here becomes
+     * "\r\n" on disk, so ftell/fread disagree by one byte per
+     * newline (CI run 40330619987: save OK, load INTERNAL).
+     * "wb"/"rb" make the bytes identical on every platform. */
+    FILE *f = fopen(path, "wb");
     if (f == NULL) return RB_ERROR_INTERNAL;
     fprintf(f, "{\"devices\":[");
     for (size_t i = 0; i < reg->count; i++) {
@@ -357,7 +362,10 @@ static int jr_find_key(json_reader_t *r, const char *key) {
 
 rb_status_t rb_registry_load(rb_registry_t *reg, const char *path) {
     if (reg == NULL || path == NULL) return RB_ERROR_INVALID_ARGUMENT;
-    FILE *f = fopen(path, "r");
+    /* Binary mode: see rb_registry_save — in Windows text mode
+     * ftell counts "\r\n" as 2 bytes but fread translates it back
+     * to 1, so the size check below would spuriously fail. */
+    FILE *f = fopen(path, "rb");
     if (f == NULL) return RB_ERROR_NOT_FOUND;
     fseek(f, 0, SEEK_END);
     long size = ftell(f);
