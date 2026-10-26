@@ -9,7 +9,7 @@
 #ifndef RADIOBRIDGE_RB_MOCK_STATE_H
 #define RADIOBRIDGE_RB_MOCK_STATE_H
 
-#include <pthread.h>
+#include "core/rb_thread.h"
 
 #include "rb_internal.h"
 
@@ -26,7 +26,7 @@ typedef struct mock_conn {
     int auto_reconnect;
     uint32_t max_reconnect_attempts;
     uint32_t reconnect_delay_ms;
-    pthread_t reconnect_thread;
+    rb_thread_t reconnect_thread;
     int reconnect_running;
     volatile int reconnect_stop;
     struct mock_conn *next;
@@ -38,19 +38,19 @@ typedef struct mock_sub {
     rb_uuid_t characteristic_uuid;
     rb_ble_notify_callback_t cb;
     void *ud;
-    pthread_t thread;
+    rb_thread_t thread;
     int running;
     volatile int stop;
     struct mock_sub *next;
 } mock_sub_t;
 
 typedef struct mock_state {
-    pthread_mutex_t lock;
+    rb_mutex_t lock;
     volatile int stopping;
     rb_context_t *ctx;
 
     /* BLE scan job. */
-    pthread_t scan_thread;
+    rb_thread_t scan_thread;
     int scan_running;
     volatile int scan_stop;
     rb_operation_id_t scan_op;
@@ -77,7 +77,7 @@ typedef struct mock_state {
     int8_t wifi_signal_dbm;
 
     /* Wi-Fi scan job. */
-    pthread_t wscan_thread;
+    rb_thread_t wscan_thread;
     int wscan_running;
     volatile int wscan_stop;
     rb_operation_id_t wscan_op;

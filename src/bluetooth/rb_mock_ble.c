@@ -46,7 +46,7 @@ typedef struct {
 } mock_device_def_t;
 
 static mock_device_def_t g_catalog[MOCK_NDEV];
-static pthread_once_t g_catalog_once = PTHREAD_ONCE_INIT;
+static rb_once_t g_catalog_once = RB_ONCE_INIT;
 
 static rb_uuid_t u16(uint16_t v) {
     rb_uuid_t u;
@@ -153,7 +153,7 @@ static void build_catalog(void) {
 }
 
 const rb_ble_device_t *rb_mock_ble_catalog(size_t *count) {
-    pthread_once(&g_catalog_once, build_catalog);
+    rb_once(&g_catalog_once, build_catalog);
     if (count != NULL) *count = MOCK_NDEV;
     /* Return a pointer to the first device struct; devices are laid out
      * with stride sizeof(mock_device_def_t), so callers must use
@@ -162,7 +162,7 @@ const rb_ble_device_t *rb_mock_ble_catalog(size_t *count) {
 }
 
 static const mock_device_def_t *mock_find(const char *address) {
-    pthread_once(&g_catalog_once, build_catalog);
+    rb_once(&g_catalog_once, build_catalog);
     for (int i = 0; i < MOCK_NDEV; i++) {
         if (strcmp(g_catalog[i].dev.address, address) == 0)
             return &g_catalog[i];
@@ -245,7 +245,7 @@ static void *mock_scan_thread(void *arg) {
     size_t count = 0;
     const rb_ble_device_t *devs = rb_mock_ble_catalog(&count);
     (void)devs;
-    pthread_once(&g_catalog_once, build_catalog);
+    rb_once(&g_catalog_once, build_catalog);
     for (int i = 0; i < MOCK_NDEV; i++) {
         if (st->scan_stop || st->stopping) break;
         if (rb_op_is_cancelled(ctx, st->scan_op)) break;
@@ -264,9 +264,9 @@ static void *mock_scan_thread(void *arg) {
             rb_sleep_ms(10);
         }
     }
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     st->scan_running = 0;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     rb_op_mark_done(ctx, st->scan_op);
     return NULL;
 }
@@ -276,9 +276,9 @@ static rb_status_t mock_ble_scan_start(rb_context_t *ctx,
                                        rb_ble_scan_callback_t cb, void *ud,
                                        rb_operation_id_t op) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     if (st->scan_running) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_ALREADY_IN_PROGRESS;
     }
     st->scan_opts = *opts;
@@ -290,34 +290,34 @@ static rb_status_t mock_ble_scan_start(rb_context_t *ctx,
     scan_arg_t *a = (scan_arg_t *)malloc(sizeof(*a));
     if (a == NULL) {
         st->scan_running = 0;
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NO_MEMORY;
     }
     a->ctx = ctx;
     a->st = st;
-    if (pthread_create(&st->scan_thread, NULL, mock_scan_thread, a) != 0) {
+    if (rb_thread_create(&st->scan_thread, mock_scan_thread, a) != 0) {
         free(a);
         st->scan_running = 0;
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_INTERNAL;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     return RB_OK;
 }
 
 static rb_status_t mock_ble_scan_stop(rb_context_t *ctx,
                                       rb_operation_id_t op) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_t th = 0;
-    pthread_mutex_lock(&st->lock);
+    rb_thread_t th = RB_THREAD_INVALID;
+    rb_mutex_lock(&st->lock);
     if (!st->scan_running || st->scan_op != op) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_FOUND;
     }
     st->scan_stop = 1;
     th = st->scan_thread;
-    pthread_mutex_unlock(&st->lock);
-    if (!pthread_equal(pthread_self(), th)) pthread_join(th, NULL);
+    rb_mutex_unlock(&st->lock);
+    if (!rb_thread_equal(rb_thread_self(), th)) rb_thread_join(th);
     return RB_OK;
 }
 
@@ -358,16 +358,16 @@ static void *mock_connect_thread(void *arg) {
     free(a);
     rb_sleep_ms(100);
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     int cancelled = rb_op_is_cancelled(ctx, c->op);
     int known = mock_find(c->address) != NULL;
     int stopping = st->stopping;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     rb_operation_id_t op = c->op;
     if (cancelled || stopping) {
         mock_conn_event(ctx, c, RB_BLE_FAILED, RB_ERROR_CANCELLED,
                         "connect cancelled");
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
         /* Remove the failed entry. */
         mock_conn_t **pp = &st->conns;
         while (*pp != NULL) {
@@ -377,7 +377,7 @@ static void *mock_connect_thread(void *arg) {
             }
             pp = &(*pp)->next;
         }
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         free(c);
         rb_op_mark_done(ctx, op);
         return NULL;
@@ -385,7 +385,7 @@ static void *mock_connect_thread(void *arg) {
     if (!known) {
         mock_conn_event(ctx, c, RB_BLE_FAILED, RB_ERROR_NOT_FOUND,
                         "device not found");
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
         mock_conn_t **pp = &st->conns;
         while (*pp != NULL) {
             if (*pp == c) {
@@ -394,14 +394,14 @@ static void *mock_connect_thread(void *arg) {
             }
             pp = &(*pp)->next;
         }
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         free(c);
         rb_op_mark_done(ctx, op);
         return NULL;
     }
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     c->state = RB_BLE_CONNECTED;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     mock_conn_event(ctx, c, RB_BLE_CONNECTED, RB_OK, "connected");
     rb_op_mark_done(ctx, c->op);
     return NULL;
@@ -413,12 +413,12 @@ static rb_status_t mock_ble_connect(rb_context_t *ctx,
                                     rb_ble_connection_callback_t cb,
                                     void *ud, rb_operation_id_t op) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *existing = mock_conn_find(st, device->address);
     if (existing != NULL &&
         (existing->state == RB_BLE_CONNECTED ||
          existing->state == RB_BLE_CONNECTING)) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_ALREADY_IN_PROGRESS;
     }
     if (existing != NULL) {
@@ -426,7 +426,7 @@ static rb_status_t mock_ble_connect(rb_context_t *ctx,
          * Join a running reconnect worker first — never free an entry
          * a thread still touches. */
         int rec_running = existing->reconnect_running;
-        pthread_t rec_thread = existing->reconnect_thread;
+        rb_thread_t rec_thread = existing->reconnect_thread;
         if (rec_running) existing->reconnect_stop = 1;
         mock_conn_t **pp = &st->conns;
         while (*pp != NULL) {
@@ -436,15 +436,15 @@ static rb_status_t mock_ble_connect(rb_context_t *ctx,
             }
             pp = &(*pp)->next;
         }
-        pthread_mutex_unlock(&st->lock);
-        if (rec_running && !pthread_equal(pthread_self(), rec_thread))
-            pthread_join(rec_thread, NULL);
+        rb_mutex_unlock(&st->lock);
+        if (rec_running && !rb_thread_equal(rb_thread_self(), rec_thread))
+            rb_thread_join(rec_thread);
         free(existing);
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
     }
     mock_conn_t *c = (mock_conn_t *)calloc(1, sizeof(*c));
     if (c == NULL) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NO_MEMORY;
     }
     rb_copy_str(c->address, sizeof(c->address), device->address);
@@ -467,21 +467,21 @@ static rb_status_t mock_ble_connect(rb_context_t *ctx,
     if (a == NULL) {
         st->conns = c->next;
         free(c);
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NO_MEMORY;
     }
     a->ctx = ctx;
     a->conn = c;
-    pthread_t th;
-    if (pthread_create(&th, NULL, mock_connect_thread, a) != 0) {
+    rb_thread_t th;
+    if (rb_thread_create(&th, mock_connect_thread, a) != 0) {
         free(a);
         st->conns = c->next;
         free(c);
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_INTERNAL;
     }
-    pthread_detach(th);
-    pthread_mutex_unlock(&st->lock);
+    rb_thread_detach(th);
+    rb_mutex_unlock(&st->lock);
     mock_conn_event(ctx, c, RB_BLE_CONNECTING, RB_OK, "connecting");
     return RB_OK;
 }
@@ -490,7 +490,7 @@ static void mock_stop_subs_for(mock_state_t *st, const char *address) {
     /* Collect threads to join without holding the lock. */
     mock_sub_t *doomed[64];
     size_t n = 0;
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_sub_t **pp = &st->subs;
     while (*pp != NULL) {
         mock_sub_t *s = *pp;
@@ -502,11 +502,11 @@ static void mock_stop_subs_for(mock_state_t *st, const char *address) {
             pp = &s->next;
         }
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     for (size_t i = 0; i < n; i++) {
         if (doomed[i]->running &&
-            !pthread_equal(pthread_self(), doomed[i]->thread))
-            pthread_join(doomed[i]->thread, NULL);
+            !rb_thread_equal(rb_thread_self(), doomed[i]->thread))
+            rb_thread_join(doomed[i]->thread);
         free(doomed[i]);
     }
 }
@@ -514,15 +514,15 @@ static void mock_stop_subs_for(mock_state_t *st, const char *address) {
 static rb_status_t mock_ble_disconnect(rb_context_t *ctx,
                                        const rb_device_id_t *device) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *c = mock_conn_find(st, device->address);
     if (c == NULL || c->state != RB_BLE_CONNECTED) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_CONNECTED;
     }
     c->state = RB_BLE_DISCONNECTED;
     int rec_running = c->reconnect_running;
-    pthread_t rec_thread = c->reconnect_thread;
+    rb_thread_t rec_thread = c->reconnect_thread;
     if (rec_running) c->reconnect_stop = 1;
     mock_conn_t **pp = &st->conns;
     while (*pp != NULL) {
@@ -532,9 +532,9 @@ static rb_status_t mock_ble_disconnect(rb_context_t *ctx,
         }
         pp = &(*pp)->next;
     }
-    pthread_mutex_unlock(&st->lock);
-    if (rec_running && !pthread_equal(pthread_self(), rec_thread))
-        pthread_join(rec_thread, NULL);
+    rb_mutex_unlock(&st->lock);
+    if (rec_running && !rb_thread_equal(rb_thread_self(), rec_thread))
+        rb_thread_join(rec_thread);
     mock_stop_subs_for(st, device->address);
     rb_emit_event(ctx, RB_EVENT_BACKEND_STATE, RB_OK,
                   "BLE device disconnected");
@@ -566,49 +566,49 @@ static void *mock_reconnect_thread(void *arg) {
         mock_conn_event(ctx, c, RB_BLE_CONNECTING, RB_OK, msg);
         rb_sleep_ms(100);
         if (c->reconnect_stop || st->stopping) goto done;
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
         c->state = RB_BLE_CONNECTED;
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         mock_conn_event(ctx, c, RB_BLE_CONNECTED, RB_OK,
                         "reconnected");
         break; /* Mock radios always succeed on the first attempt. */
     }
 done:
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     c->reconnect_running = 0;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     return NULL;
 }
 
 static rb_status_t mock_trigger_disconnect(rb_context_t *ctx,
                                            const rb_device_id_t *device) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *c = mock_conn_find(st, device->address);
     if (c == NULL || c->state != RB_BLE_CONNECTED) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_CONNECTED;
     }
     c->state = RB_BLE_DISCONNECTED;
     int want_reconnect = c->auto_reconnect && st->policy.enabled;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     mock_conn_event(ctx, c, RB_BLE_DISCONNECTED, RB_OK,
                     "simulated radio drop");
     if (want_reconnect) {
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
         c->reconnect_stop = 0;
         c->reconnect_running = 1;
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         conn_arg_t *a = (conn_arg_t *)malloc(sizeof(*a));
         if (a == NULL) return RB_ERROR_NO_MEMORY;
         a->ctx = ctx;
         a->conn = c;
-        if (pthread_create(&c->reconnect_thread, NULL,
+        if (rb_thread_create(&c->reconnect_thread,
                            mock_reconnect_thread, a) != 0) {
             free(a);
-            pthread_mutex_lock(&st->lock);
+            rb_mutex_lock(&st->lock);
             c->reconnect_running = 0;
-            pthread_mutex_unlock(&st->lock);
+            rb_mutex_unlock(&st->lock);
             return RB_ERROR_INTERNAL;
         }
     }
@@ -677,13 +677,13 @@ static rb_status_t mock_ble_discover(rb_context_t *ctx,
                                      rb_ble_service_t **out_services,
                                      size_t *out_count) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *c = mock_conn_find(st, device->address);
     if (c == NULL || c->state != RB_BLE_CONNECTED) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_CONNECTED;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     const mock_device_def_t *def = mock_find(device->address);
     if (def == NULL) return RB_ERROR_NOT_FOUND;
     rb_ble_service_t *svcs =
@@ -717,13 +717,13 @@ static rb_status_t mock_ble_read(rb_context_t *ctx,
                                  const rb_uuid_t *characteristic_uuid,
                                  uint8_t *out_value, size_t *out_len) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *c = mock_conn_find(st, device->address);
     if (c == NULL || c->state != RB_BLE_CONNECTED) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_CONNECTED;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     const mock_device_def_t *def = mock_find(device->address);
     if (def == NULL) return RB_ERROR_NOT_FOUND;
     const mock_char_def_t *chr =
@@ -745,13 +745,13 @@ static rb_status_t mock_ble_write(rb_context_t *ctx,
                                   const uint8_t *value, size_t value_len,
                                   int with_response) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *c = mock_conn_find(st, device->address);
     if (c == NULL || c->state != RB_BLE_CONNECTED) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_CONNECTED;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     const mock_device_def_t *def = mock_find(device->address);
     if (def == NULL) return RB_ERROR_NOT_FOUND;
     const mock_char_def_t *chr =
@@ -762,12 +762,12 @@ static rb_status_t mock_ble_write(rb_context_t *ctx,
     if ((chr->props & need) == 0) return RB_ERROR_NOT_SUPPORTED;
     /* Only the demo-tag echo characteristic is writable in the catalog;
      * other writable characteristics would store here in the same way. */
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     size_t n = value_len > RB_BLE_MAX_VALUE_LEN ? RB_BLE_MAX_VALUE_LEN
                                                 : value_len;
     if (n > 0) memcpy(st->echo_value, value, n);
     st->echo_len = n;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     return RB_OK;
 }
 
@@ -834,13 +834,13 @@ static rb_status_t mock_ble_subscribe(rb_context_t *ctx,
                                       rb_ble_notify_callback_t cb,
                                       void *ud) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *c = mock_conn_find(st, device->address);
     if (c == NULL || c->state != RB_BLE_CONNECTED) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_CONNECTED;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     const mock_device_def_t *def = mock_find(device->address);
     if (def == NULL) return RB_ERROR_NOT_FOUND;
     const mock_char_def_t *chr =
@@ -862,13 +862,13 @@ static rb_status_t mock_ble_subscribe(rb_context_t *ctx,
     }
     a->ctx = ctx;
     a->sub = sub;
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     sub->next = st->subs;
     st->subs = sub;
-    pthread_mutex_unlock(&st->lock);
-    if (pthread_create(&sub->thread, NULL, mock_notify_thread, a) != 0) {
+    rb_mutex_unlock(&st->lock);
+    if (rb_thread_create(&sub->thread, mock_notify_thread, a) != 0) {
         free(a);
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
         mock_sub_t **pp = &st->subs;
         while (*pp != NULL) {
             if (*pp == sub) {
@@ -877,13 +877,13 @@ static rb_status_t mock_ble_subscribe(rb_context_t *ctx,
             }
             pp = &(*pp)->next;
         }
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         free(sub);
         return RB_ERROR_INTERNAL;
     }
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     sub->running = 1;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     return RB_OK;
 }
 
@@ -893,7 +893,7 @@ static rb_status_t mock_ble_unsubscribe(rb_context_t *ctx,
                                         const rb_uuid_t *characteristic_uuid) {
     mock_state_t *st = rb_mock_state(ctx);
     mock_sub_t *target = NULL;
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_sub_t **pp = &st->subs;
     while (*pp != NULL) {
         mock_sub_t *s = *pp;
@@ -908,11 +908,11 @@ static rb_status_t mock_ble_unsubscribe(rb_context_t *ctx,
         }
         pp = &s->next;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     if (target == NULL) return RB_ERROR_NOT_FOUND;
     if (target->running &&
-        !pthread_equal(pthread_self(), target->thread))
-        pthread_join(target->thread, NULL);
+        !rb_thread_equal(rb_thread_self(), target->thread))
+        rb_thread_join(target->thread);
     free(target);
     return RB_OK;
 }
@@ -921,13 +921,13 @@ static rb_status_t mock_ble_get_rssi(rb_context_t *ctx,
                                      const rb_device_id_t *device,
                                      int8_t *out_rssi_dbm) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *c = mock_conn_find(st, device->address);
     if (c == NULL || c->state != RB_BLE_CONNECTED) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_CONNECTED;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     const mock_device_def_t *def = mock_find(device->address);
     if (def == NULL) return RB_ERROR_NOT_FOUND;
     *out_rssi_dbm = def->dev.rssi_dbm;
@@ -937,9 +937,9 @@ static rb_status_t mock_ble_get_rssi(rb_context_t *ctx,
 static rb_status_t mock_ble_set_reconnect_policy(
     rb_context_t *ctx, const rb_reconnect_policy_t *policy) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     st->policy = *policy;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     return RB_OK;
 }
 
@@ -976,7 +976,7 @@ rb_status_t rb_mock_probe(rb_capabilities_t *caps) {
 static rb_status_t mock_create(rb_context_t *ctx) {
     mock_state_t *st = (mock_state_t *)calloc(1, sizeof(*st));
     if (st == NULL) return RB_ERROR_NO_MEMORY;
-    pthread_mutex_init(&st->lock, NULL);
+    rb_mutex_init(&st->lock);
     st->ctx = ctx;
     st->policy.enabled = 1;
     st->policy.max_attempts = 3;
@@ -995,34 +995,34 @@ static void mock_destroy(rb_context_t *ctx) {
     if (st == NULL) return;
     st->stopping = 1;
     /* Stop scans first (joins their threads). */
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     int scan_running = st->scan_running;
     rb_operation_id_t scan_op = st->scan_op;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     if (scan_running) {
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
         st->scan_stop = 1;
-        pthread_mutex_unlock(&st->lock);
-        pthread_join(st->scan_thread, NULL);
+        rb_mutex_unlock(&st->lock);
+        rb_thread_join(st->scan_thread);
         rb_op_mark_done(ctx, scan_op);
     }
     rb_mock_wifi_stop_all(st);
     /* Stop subscriptions and reconnect workers, then free entries. */
     mock_stop_subs_for(st, NULL);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     mock_conn_t *conns = st->conns;
     st->conns = NULL;
     for (mock_conn_t *c = conns; c != NULL; c = c->next) {
         if (c->reconnect_running) c->reconnect_stop = 1;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     for (mock_conn_t *c = conns; c != NULL;) {
         mock_conn_t *next = c->next;
-        if (c->reconnect_running) pthread_join(c->reconnect_thread, NULL);
+        if (c->reconnect_running) rb_thread_join(c->reconnect_thread);
         free(c);
         c = next;
     }
-    pthread_mutex_destroy(&st->lock);
+    rb_mutex_destroy(&st->lock);
     free(st);
     ctx->backend_state = NULL;
 }

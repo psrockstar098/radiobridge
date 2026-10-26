@@ -12,7 +12,7 @@
 #ifndef RADIOBRIDGE_RB_INTERNAL_H
 #define RADIOBRIDGE_RB_INTERNAL_H
 
-#include <pthread.h>
+#include "core/rb_thread.h"
 
 #include "radiobridge/rb.h"
 
@@ -131,7 +131,7 @@ typedef struct rb_op_entry {
 } rb_op_entry_t;
 
 struct rb_context {
-    pthread_mutex_t lock;
+    rb_mutex_t lock;
     rb_config_t config;
     const rb_backend_ops_t *ops;
     void *backend_state;

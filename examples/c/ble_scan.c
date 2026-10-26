@@ -13,6 +13,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 #include "radiobridge/rb.h"
 
@@ -25,10 +28,14 @@ static void on_scan(rb_context_t *ctx, const rb_ble_device_t *dev,
 }
 
 static void sleep_ms(unsigned int ms) {
+#ifdef _WIN32
+    Sleep(ms);
+#else
     struct timespec ts;
     ts.tv_sec = (time_t)(ms / 1000);
     ts.tv_nsec = (long)(ms % 1000) * 1000000L;
     nanosleep(&ts, NULL);
+#endif
 }
 
 int main(void) {

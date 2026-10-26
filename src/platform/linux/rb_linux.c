@@ -27,7 +27,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "core/rb_internal.h"
 
@@ -124,9 +123,9 @@ rb_status_t rb_linux_probe(rb_capabilities_t *caps) {
     rb_copy_str(caps->backend_version, sizeof(caps->backend_version),
                 "0.1.0");
     rb_copy_str(caps->os_name, sizeof(caps->os_name), "linux");
-    int has_adapter = access(RB_LINUX_BT_SYSFS, F_OK) == 0;
-    int has_bus = access(RB_LINUX_DBUS_SOCKET, F_OK) == 0;
-    int has_nm = access(RB_LINUX_NM_RUNDIR, F_OK) == 0;
+    int has_adapter = rb_path_exists(RB_LINUX_BT_SYSFS);
+    int has_bus = rb_path_exists(RB_LINUX_DBUS_SOCKET);
+    int has_nm = rb_path_exists(RB_LINUX_NM_RUNDIR);
     /* Phase 1/2 scope: no transport, so every feature is UNAVAILABLE
      * regardless of what the probe finds. The detail string is the
      * diagnostic that tells Phase 2 what to wire up. */

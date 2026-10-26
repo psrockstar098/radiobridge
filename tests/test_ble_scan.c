@@ -5,26 +5,26 @@
 typedef struct {
     rb_ble_device_t found[16];
     volatile int count;
-    pthread_mutex_t lock;
+    rb_mutex_t lock;
 } scan_collect_t;
 
 static void on_scan(rb_context_t *ctx, const rb_ble_device_t *dev,
                     void *ud) {
     (void)ctx;
     scan_collect_t *c = (scan_collect_t *)ud;
-    pthread_mutex_lock(&c->lock);
+    rb_mutex_lock(&c->lock);
     if (c->count < 16) c->found[c->count] = *dev;
     c->count++;
-    pthread_mutex_unlock(&c->lock);
+    rb_mutex_unlock(&c->lock);
 }
 
 static int has_address(scan_collect_t *c, const char *addr) {
     int found = 0;
-    pthread_mutex_lock(&c->lock);
+    rb_mutex_lock(&c->lock);
     for (int i = 0; i < c->count && i < 16; i++) {
         if (strcmp(c->found[i].address, addr) == 0) found = 1;
     }
-    pthread_mutex_unlock(&c->lock);
+    rb_mutex_unlock(&c->lock);
     return found;
 }
 
@@ -33,16 +33,16 @@ static int run_scan(rb_context_t *ctx,
                     const rb_ble_scan_options_t *opts,
                     scan_collect_t *c) {
     memset(c, 0, sizeof(*c));
-    pthread_mutex_init(&c->lock, NULL);
+    rb_mutex_init(&c->lock);
     rb_operation_id_t op = 0;
     rb_status_t st = rb_ble_scan_start(ctx, opts, on_scan, c, &op);
     if (st != RB_OK) {
-        pthread_mutex_destroy(&c->lock);
+        rb_mutex_destroy(&c->lock);
         return -1;
     }
     /* Catalog delivery takes ~0.5s worst case; wait generously. */
     test_sleep_ms(1200);
-    pthread_mutex_destroy(&c->lock);
+    rb_mutex_destroy(&c->lock);
     return c->count;
 }
 
@@ -123,7 +123,7 @@ int main(void) {
     opts.manufacturer_id = -1;
     scan_collect_t c1;
     memset(&c1, 0, sizeof(c1));
-    pthread_mutex_init(&c1.lock, NULL);
+    rb_mutex_init(&c1.lock);
     rb_operation_id_t op1 = 0, op2 = 0;
     CHECK_ST(rb_ble_scan_start(ctx, &opts, on_scan, &c1, &op1), RB_OK);
     CHECK_ST(rb_ble_scan_start(ctx, &opts, on_scan, &c1, &op2),
@@ -131,7 +131,7 @@ int main(void) {
     CHECK_ST(rb_ble_scan_stop(ctx, 999999), RB_ERROR_NOT_FOUND);
     CHECK_ST(rb_ble_scan_stop(ctx, op1), RB_OK);
     test_sleep_ms(300);
-    pthread_mutex_destroy(&c1.lock);
+    rb_mutex_destroy(&c1.lock);
 
     /* A fresh scan works after the stopped one. */
     memset(&opts, 0, sizeof(opts));

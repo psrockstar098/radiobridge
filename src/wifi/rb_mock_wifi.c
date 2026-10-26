@@ -60,7 +60,7 @@ static const rb_wifi_network_t *mock_wifi_find(const char *ssid) {
 rb_status_t rb_mock_wifi_get_status(rb_context_t *ctx,
                                     rb_wifi_status_t *out) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     memset(out, 0, sizeof(*out));
     out->state = st->wifi_state;
     out->diag = st->wifi_diag;
@@ -87,7 +87,7 @@ rb_status_t rb_mock_wifi_get_status(rb_context_t *ctx,
                         "unavailable (mock)");
             break;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     return RB_OK;
 }
 
@@ -123,9 +123,9 @@ static void *mock_wscan_thread(void *arg) {
             rb_sleep_ms(10);
         }
     }
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     st->wscan_running = 0;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     rb_op_mark_done(ctx, st->wscan_op);
     return NULL;
 }
@@ -136,9 +136,9 @@ rb_status_t rb_mock_wifi_scan_start(rb_context_t *ctx,
                                     rb_operation_id_t op) {
     (void)opts; /* Phase 1: timeout handled by caller stop/cancel. */
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     if (st->wscan_running) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_ALREADY_IN_PROGRESS;
     }
     st->wscan_cb = cb;
@@ -149,48 +149,48 @@ rb_status_t rb_mock_wifi_scan_start(rb_context_t *ctx,
     wscan_arg_t *a = (wscan_arg_t *)malloc(sizeof(*a));
     if (a == NULL) {
         st->wscan_running = 0;
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NO_MEMORY;
     }
     a->ctx = ctx;
     a->st = st;
-    if (pthread_create(&st->wscan_thread, NULL, mock_wscan_thread, a) !=
+    if (rb_thread_create(&st->wscan_thread, mock_wscan_thread, a) !=
         0) {
         free(a);
         st->wscan_running = 0;
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_INTERNAL;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     return RB_OK;
 }
 
 rb_status_t rb_mock_wifi_scan_stop(rb_context_t *ctx,
                                    rb_operation_id_t op) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_t th = 0;
-    pthread_mutex_lock(&st->lock);
+    rb_thread_t th = RB_THREAD_INVALID;
+    rb_mutex_lock(&st->lock);
     if (!st->wscan_running || st->wscan_op != op) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_NOT_FOUND;
     }
     st->wscan_stop = 1;
     th = st->wscan_thread;
-    pthread_mutex_unlock(&st->lock);
-    if (!pthread_equal(pthread_self(), th)) pthread_join(th, NULL);
+    rb_mutex_unlock(&st->lock);
+    if (!rb_thread_equal(rb_thread_self(), th)) rb_thread_join(th);
     return RB_OK;
 }
 
 void rb_mock_wifi_stop_all(mock_state_t *st) {
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     int running = st->wscan_running;
     rb_operation_id_t op = st->wscan_op;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     if (running) {
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
         st->wscan_stop = 1;
-        pthread_mutex_unlock(&st->lock);
-        pthread_join(st->wscan_thread, NULL);
+        rb_mutex_unlock(&st->lock);
+        rb_thread_join(st->wscan_thread);
         rb_op_mark_done(st->ctx, op);
     }
 }
@@ -210,9 +210,9 @@ static void *mock_wconn_thread(void *arg) {
     mock_state_t *st = rb_mock_state(ctx);
     rb_sleep_ms(100);
     const rb_wifi_network_t *net = mock_wifi_find(a->ssid);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     if (st->stopping) {
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         free(a);
         return NULL;
     }
@@ -229,7 +229,7 @@ static void *mock_wconn_thread(void *arg) {
         st->wifi_state = RB_WIFI_FAILED;
         st->wifi_diag = RB_WIFI_DIAG_FAILED;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     rb_emit_event(ctx, RB_EVENT_WIFI_CHANGED, RB_OK,
                   net != NULL ? "Wi-Fi connected (mock)"
                               : "Wi-Fi connect failed (mock)");
@@ -248,30 +248,30 @@ rb_status_t rb_mock_wifi_connect(rb_context_t *ctx, const char *ssid,
         (password == NULL || password[0] == '\0'))
         return RB_ERROR_AUTH_FAILED;
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     st->wifi_state = RB_WIFI_CONNECTING;
     st->wifi_diag = RB_WIFI_DIAG_OK;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     wconn_arg_t *a = (wconn_arg_t *)malloc(sizeof(*a));
     if (a == NULL) return RB_ERROR_NO_MEMORY;
     a->ctx = ctx;
     rb_copy_str(a->ssid, sizeof(a->ssid), ssid);
-    pthread_t th;
-    if (pthread_create(&th, NULL, mock_wconn_thread, a) != 0) {
+    rb_thread_t th;
+    if (rb_thread_create(&th, mock_wconn_thread, a) != 0) {
         free(a);
-        pthread_mutex_lock(&st->lock);
+        rb_mutex_lock(&st->lock);
         st->wifi_state = RB_WIFI_DISCONNECTED;
         st->wifi_diag = RB_WIFI_DIAG_DISCONNECTED;
-        pthread_mutex_unlock(&st->lock);
+        rb_mutex_unlock(&st->lock);
         return RB_ERROR_INTERNAL;
     }
-    pthread_detach(th);
+    rb_thread_detach(th);
     return RB_OK;
 }
 
 rb_status_t rb_mock_wifi_disconnect(rb_context_t *ctx) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     int was_connected = (st->wifi_state == RB_WIFI_CONNECTED ||
                          st->wifi_state == RB_WIFI_CONNECTING);
     st->wifi_state = RB_WIFI_DISCONNECTED;
@@ -281,7 +281,7 @@ rb_status_t rb_mock_wifi_disconnect(rb_context_t *ctx) {
     st->wifi_ip[0] = '\0';
     st->wifi_gateway[0] = '\0';
     st->wifi_signal_dbm = 0;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     if (was_connected)
         rb_emit_event(ctx, RB_EVENT_WIFI_CHANGED, RB_OK,
                       "Wi-Fi disconnected (mock)");
@@ -292,10 +292,10 @@ rb_status_t rb_mock_wifi_measure_quality(rb_context_t *ctx,
                                          const char *endpoint,
                                          rb_wifi_quality_t *out) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     int connected = (st->wifi_state == RB_WIFI_CONNECTED);
     int8_t signal = st->wifi_signal_dbm;
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     memset(out, 0, sizeof(*out));
     rb_copy_str(out->endpoint, sizeof(out->endpoint),
                 endpoint != NULL && endpoint[0] != '\0' ? endpoint
@@ -321,7 +321,7 @@ rb_status_t rb_mock_wifi_measure_quality(rb_context_t *ctx,
 rb_status_t rb_mock_wifi_trigger_change(rb_context_t *ctx,
                                         rb_wifi_state_t state) {
     mock_state_t *st = rb_mock_state(ctx);
-    pthread_mutex_lock(&st->lock);
+    rb_mutex_lock(&st->lock);
     st->wifi_state = state;
     switch (state) {
         case RB_WIFI_CONNECTED:
@@ -340,7 +340,7 @@ rb_status_t rb_mock_wifi_trigger_change(rb_context_t *ctx,
             st->wifi_diag = RB_WIFI_DIAG_FAILED;
             break;
     }
-    pthread_mutex_unlock(&st->lock);
+    rb_mutex_unlock(&st->lock);
     rb_emit_event(ctx, RB_EVENT_WIFI_CHANGED, RB_OK,
                   "Wi-Fi state changed (mock trigger)");
     return RB_OK;

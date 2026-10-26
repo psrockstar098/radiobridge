@@ -4,7 +4,7 @@
 typedef struct {
     char messages[32][512];
     volatile int count;
-    pthread_mutex_t lock;
+    rb_mutex_t lock;
 } log_collect_t;
 
 static void on_log(rb_log_level_t level, const char *subsystem,
@@ -12,20 +12,20 @@ static void on_log(rb_log_level_t level, const char *subsystem,
     (void)level;
     (void)subsystem;
     log_collect_t *c = (log_collect_t *)ud;
-    pthread_mutex_lock(&c->lock);
+    rb_mutex_lock(&c->lock);
     if (c->count < 32)
         snprintf(c->messages[c->count], 512, "%s", message);
     c->count++;
-    pthread_mutex_unlock(&c->lock);
+    rb_mutex_unlock(&c->lock);
 }
 
 static int log_contains(log_collect_t *c, const char *needle) {
     int found = 0;
-    pthread_mutex_lock(&c->lock);
+    rb_mutex_lock(&c->lock);
     for (int i = 0; i < c->count && i < 32; i++) {
         if (strstr(c->messages[i], needle) != NULL) found = 1;
     }
-    pthread_mutex_unlock(&c->lock);
+    rb_mutex_unlock(&c->lock);
     return found;
 }
 
@@ -33,7 +33,7 @@ int main(void) {
     /* DEBUG level: the init INFO message is captured. */
     log_collect_t lc;
     memset(&lc, 0, sizeof(lc));
-    pthread_mutex_init(&lc.lock, NULL);
+    rb_mutex_init(&lc.lock);
     rb_config_t cfg;
     memset(&cfg, 0, sizeof(cfg));
     cfg.backend = RB_BACKEND_MOCK;
@@ -53,7 +53,7 @@ int main(void) {
      * its init message never arrives. */
     log_collect_t lc2;
     memset(&lc2, 0, sizeof(lc2));
-    pthread_mutex_init(&lc2.lock, NULL);
+    rb_mutex_init(&lc2.lock);
     rb_config_t cfg2;
     memset(&cfg2, 0, sizeof(cfg2));
     cfg2.backend = RB_BACKEND_MOCK;
@@ -78,7 +78,7 @@ int main(void) {
 
     rb_shutdown(ctx);
     rb_shutdown(ctx2);
-    pthread_mutex_destroy(&lc.lock);
-    pthread_mutex_destroy(&lc2.lock);
+    rb_mutex_destroy(&lc.lock);
+    rb_mutex_destroy(&lc2.lock);
     TEST_END();
 }

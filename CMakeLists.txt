@@ -18,6 +18,7 @@ find_package(Threads REQUIRED)
 if(RB_BUILD_SHARED)
   add_library(radiobridge SHARED
     src/core/rb_core.c
+    src/core/rb_thread.c
     src/bluetooth/rb_mock_ble.c
     src/wifi/rb_mock_wifi.c
     src/platform/linux/rb_linux.c
@@ -25,6 +26,7 @@ if(RB_BUILD_SHARED)
 else()
   add_library(radiobridge STATIC
     src/core/rb_core.c
+    src/core/rb_thread.c
     src/bluetooth/rb_mock_ble.c
     src/wifi/rb_mock_wifi.c
     src/platform/linux/rb_linux.c
@@ -35,7 +37,13 @@ target_include_directories(radiobridge
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(radiobridge PRIVATE Threads::Threads)
-target_compile_options(radiobridge PRIVATE -Wall -Wextra)
+# MSVC rejects GCC/Clang warning flags outright (D8021 on -Wextra),
+# so pick warning flags per compiler instead of unconditionally.
+if(MSVC)
+  target_compile_options(radiobridge PRIVATE /W4)
+else()
+  target_compile_options(radiobridge PRIVATE -Wall -Wextra)
+endif()
 
 # Tests link the same library; they also include internal headers.
 if(RB_BUILD_TESTS)

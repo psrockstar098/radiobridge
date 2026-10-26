@@ -11,7 +11,7 @@
 
 #define _POSIX_C_SOURCE 200809L
 
-#include <pthread.h>
+#include "core/rb_thread.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,10 +52,7 @@ static int g_rb_test_failures = 0;
     } while (0)
 
 static inline void test_sleep_ms(unsigned int ms) {
-    struct timespec ts;
-    ts.tv_sec = (time_t)(ms / 1000);
-    ts.tv_nsec = (long)(ms % 1000) * 1000000L;
-    nanosleep(&ts, NULL);
+    rb_sleep_ms(ms);
 }
 
 /* Wait up to timeout_ms for *flag to become non-zero. Returns 1 on

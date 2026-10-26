@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 
 #include "rb_internal.h"
 
@@ -45,19 +44,6 @@ const char *rb_status_string(rb_status_t status) {
 /* ------------------------------------------------------------------ */
 /* Utilities                                                           */
 /* ------------------------------------------------------------------ */
-
-void rb_sleep_ms(unsigned int ms) {
-    struct timespec ts;
-    ts.tv_sec = (time_t)(ms / 1000);
-    ts.tv_nsec = (long)(ms % 1000) * 1000000L;
-    nanosleep(&ts, NULL);
-}
-
-uint64_t rb_now_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (uint64_t)ts.tv_sec * 1000u + (uint64_t)(ts.tv_nsec / 1000000L);
-}
 
 void rb_copy_str(char *dst, size_t dst_len, const char *src) {
     if (dst_len == 0) return;
@@ -133,7 +119,7 @@ void rb_emit_event(rb_context_t *ctx, rb_event_type_t type,
 /* ------------------------------------------------------------------ */
 
 rb_operation_id_t rb_op_register(rb_context_t *ctx) {
-    pthread_mutex_lock(&ctx->lock);
+    rb_mutex_lock(&ctx->lock);
     rb_operation_id_t id = ctx->next_op_id++;
     if (id == 0) id = ctx->next_op_id++; /* 0 is never a valid id */
     rb_op_entry_t *e = (rb_op_entry_t *)calloc(1, sizeof(*e));
@@ -142,12 +128,12 @@ rb_operation_id_t rb_op_register(rb_context_t *ctx) {
         e->next = ctx->op_list;
         ctx->op_list = e;
     }
-    pthread_mutex_unlock(&ctx->lock);
+    rb_mutex_unlock(&ctx->lock);
     return id;
 }
 
 void rb_op_mark_done(rb_context_t *ctx, rb_operation_id_t id) {
-    pthread_mutex_lock(&ctx->lock);
+    rb_mutex_lock(&ctx->lock);
     rb_op_entry_t **pp = &ctx->op_list;
     while (*pp != NULL) {
         if ((*pp)->id == id) {
@@ -158,26 +144,26 @@ void rb_op_mark_done(rb_context_t *ctx, rb_operation_id_t id) {
         }
         pp = &(*pp)->next;
     }
-    pthread_mutex_unlock(&ctx->lock);
+    rb_mutex_unlock(&ctx->lock);
 }
 
 int rb_op_is_cancelled(rb_context_t *ctx, rb_operation_id_t id) {
     int cancelled = 0;
-    pthread_mutex_lock(&ctx->lock);
+    rb_mutex_lock(&ctx->lock);
     for (rb_op_entry_t *e = ctx->op_list; e != NULL; e = e->next) {
         if (e->id == id) {
             cancelled = e->cancelled;
             break;
         }
     }
-    pthread_mutex_unlock(&ctx->lock);
+    rb_mutex_unlock(&ctx->lock);
     return cancelled;
 }
 
 /* Returns 1 when the id was found and flagged, 0 otherwise. */
 int rb_op_cancel_flag(rb_context_t *ctx, rb_operation_id_t id) {
     int found = 0;
-    pthread_mutex_lock(&ctx->lock);
+    rb_mutex_lock(&ctx->lock);
     for (rb_op_entry_t *e = ctx->op_list; e != NULL; e = e->next) {
         if (e->id == id) {
             e->cancelled = 1;
@@ -185,7 +171,7 @@ int rb_op_cancel_flag(rb_context_t *ctx, rb_operation_id_t id) {
             break;
         }
     }
-    pthread_mutex_unlock(&ctx->lock);
+    rb_mutex_unlock(&ctx->lock);
     return found;
 }
 
@@ -230,7 +216,7 @@ rb_status_t rb_initialize(const rb_config_t *config,
 
     rb_context_t *ctx = (rb_context_t *)calloc(1, sizeof(*ctx));
     if (ctx == NULL) return RB_ERROR_NO_MEMORY;
-    pthread_mutex_init(&ctx->lock, NULL);
+    rb_mutex_init(&ctx->lock);
     ctx->config = cfg;
     ctx->next_op_id = 1;
 
@@ -264,7 +250,7 @@ rb_status_t rb_initialize(const rb_config_t *config,
     } else {
         ops = rb_ops_for_kind(cfg.backend);
         if (ops == NULL) {
-            pthread_mutex_destroy(&ctx->lock);
+            rb_mutex_destroy(&ctx->lock);
             free(ctx);
             return RB_ERROR_INVALID_ARGUMENT;
         }
@@ -277,7 +263,7 @@ rb_status_t rb_initialize(const rb_config_t *config,
                 "backend '%s' failed to start: %s",
                 ops != NULL ? ops->name : rb_backend_kind_name(cfg.backend),
                 rb_status_string(st));
-        pthread_mutex_destroy(&ctx->lock);
+        rb_mutex_destroy(&ctx->lock);
         free(ctx);
         return st;
     }
@@ -299,13 +285,13 @@ rb_status_t rb_initialize(const rb_config_t *config,
 
 void rb_shutdown(rb_context_t *context) {
     if (context == NULL) return;
-    pthread_mutex_lock(&context->lock);
+    rb_mutex_lock(&context->lock);
     context->shutting_down = 1;
-    pthread_mutex_unlock(&context->lock);
+    rb_mutex_unlock(&context->lock);
     if (context->ops != NULL && context->ops->destroy != NULL) {
         context->ops->destroy(context);
     }
-    pthread_mutex_lock(&context->lock);
+    rb_mutex_lock(&context->lock);
     rb_op_entry_t *e = context->op_list;
     while (e != NULL) {
         rb_op_entry_t *next = e->next;
@@ -313,8 +299,8 @@ void rb_shutdown(rb_context_t *context) {
         e = next;
     }
     context->op_list = NULL;
-    pthread_mutex_unlock(&context->lock);
-    pthread_mutex_destroy(&context->lock);
+    rb_mutex_unlock(&context->lock);
+    rb_mutex_destroy(&context->lock);
     free(context);
 }
 
@@ -322,13 +308,13 @@ rb_status_t rb_get_capabilities(rb_context_t *context,
                                 rb_capabilities_t *out_caps) {
     if (context == NULL || out_caps == NULL)
         return RB_ERROR_INVALID_ARGUMENT;
-    pthread_mutex_lock(&context->lock);
+    rb_mutex_lock(&context->lock);
     if (context->shutting_down) {
-        pthread_mutex_unlock(&context->lock);
+        rb_mutex_unlock(&context->lock);
         return RB_ERROR_NOT_INITIALIZED;
     }
     *out_caps = context->caps;
-    pthread_mutex_unlock(&context->lock);
+    rb_mutex_unlock(&context->lock);
     return RB_OK;
 }
 
@@ -360,9 +346,9 @@ rb_status_t rb_set_log_level(rb_context_t *context, rb_log_level_t level) {
     if (context == NULL) return RB_ERROR_INVALID_ARGUMENT;
     if (level < RB_LOG_ERROR || level > RB_LOG_DEBUG)
         return RB_ERROR_INVALID_ARGUMENT;
-    pthread_mutex_lock(&context->lock);
+    rb_mutex_lock(&context->lock);
     context->config.log_level = level;
-    pthread_mutex_unlock(&context->lock);
+    rb_mutex_unlock(&context->lock);
     return RB_OK;
 }
 
@@ -547,9 +533,9 @@ int rb_uuid_equals(const rb_uuid_t *a, const rb_uuid_t *b) {
 
 static int rb_ctx_live(rb_context_t *ctx) {
     if (ctx == NULL) return 0;
-    pthread_mutex_lock(&ctx->lock);
+    rb_mutex_lock(&ctx->lock);
     int live = !ctx->shutting_down && ctx->ops != NULL;
-    pthread_mutex_unlock(&ctx->lock);
+    rb_mutex_unlock(&ctx->lock);
     return live;
 }
 
