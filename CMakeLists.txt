@@ -84,8 +84,13 @@ if(WIN32)
   # targets created after it is set (that exact bug failed CI run
   # 40328300493: C++/WinRT headers need /std:c++17, MSVC defaulted
   # to C++14). Set the standard on the target itself.
+  # C++20, not C++17: under C++17 C++/WinRT pulls in
+  # <experimental/coroutine>, which MSVC 14.51 rejects with hard
+  # error C2338/STL1011 (CI run 40328845336). Under C++20 it uses
+  # std <coroutine> instead. The backend code itself uses no
+  # coroutines, so the standard bump costs nothing.
   set_target_properties(radiobridge PROPERTIES
-    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+    CXX_STANDARD 20 CXX_STANDARD_REQUIRED ON)
   target_sources(radiobridge PRIVATE
     src/platform/windows/rb_windows.c
     src/platform/windows/rb_windows.cpp
