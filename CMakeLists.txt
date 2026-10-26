@@ -79,8 +79,13 @@ endif()
 # the Windows SDK + a Bluetooth-capable Windows device to verify.
 if(WIN32)
   enable_language(CXX)
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  # NOTE: CMAKE_CXX_STANDARD set here would NOT apply — the library
+  # target was already created above, and the variable only affects
+  # targets created after it is set (that exact bug failed CI run
+  # 40328300493: C++/WinRT headers need /std:c++17, MSVC defaulted
+  # to C++14). Set the standard on the target itself.
+  set_target_properties(radiobridge PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
   target_sources(radiobridge PRIVATE
     src/platform/windows/rb_windows.c
     src/platform/windows/rb_windows.cpp
