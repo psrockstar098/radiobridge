@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: radiobridge
+Description: Cross-platform C library unifying Bluetooth and Wi-Fi behind one developer API
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lradiobridge
+Libs.private: -lpthread
+Cflags: -I${includedir}

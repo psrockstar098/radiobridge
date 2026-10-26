@@ -1,0 +1,9 @@
+build/
+build-debug/
+build-assert/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+.DS_Store

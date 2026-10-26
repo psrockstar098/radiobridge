@@ -1,0 +1,40 @@
+# Proposed CI workflow for RadioBridge.
+#
+# NOTE: this file is NOT committed under .github/workflows/ — the repo
+# token used here lacks the `workflow` scope, so workflow files must be
+# applied through the GitHub web UI (same rule as MixPilot). Copy this
+# file's contents to .github/workflows/ci.yml in the web UI, then
+# verify with a fresh pull that the workflow appears and runs green.
+#
+# What it does: builds the static library + examples and runs the
+# full CTest suite on Linux, macOS, and Windows. The suite runs on
+# mock backends only, so it passes on runner machines without radios.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Configure (CMake)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test (CTest)
+        run: ctest --test-dir build -C Release --output-on-failure
